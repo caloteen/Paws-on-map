@@ -3,225 +3,839 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paws on Map - บันทึกการเดินทางของทาสแมว</title>
+    <title>Paws on Map 🐾 - บันทึกการเดินทางน้องแมว</title>
+    
+    <!-- PWA & Mobile Web App Meta -->
+    <meta name="theme-color" content="#fdfbf7">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#faf8f5">
-    <link rel="apple-touch-icon" href="https://flaticon.com">
-    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlBhd3Mgb24gTWFwIiwKICAic2hvcnRfbmFtZSI6ICJQYXdzTWFwIiwKICAic3RhcnRfdXJsIjogImluZGV4Lmh0bWwiLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmYWY4ZjUiLAogICJ0aGVtZV9jb2xvciI6ICIjZTZhMTVjIgp9">
-    <style>
-        :root { --bg-color: #faf8f5; --card-color: #ffffff; --text-main: #4a3f35; --text-sub: #8c7e74; --accent-cat: #e6a15c; --visited-color: #ffdca3; --unvisited: #e8e5e0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-main); display: flex; flex-direction: column; align-items: center; padding-bottom: 40px; }
-        header { text-align: center; padding: 30px 20px; width: 100%; box-sizing: border-box; }
-        header h1 { margin: 0; font-size: 26px; font-weight: 800; }
-        header p { margin: 5px 0 0 0; font-size: 14px; color: var(--text-sub); }
-        .container { width: 95%; max-width: 500px; }
-        .stats-card { background: var(--card-color); border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,63,53,0.04); text-align: center; border: 1px solid #f0ede9; }
-        .progress-bg { background: #f0ede9; border-radius: 10px; height: 8px; margin: 12px 0; overflow: hidden; }
-        .progress-bar { background: var(--accent-cat); height: 100%; width: 0%; transition: width 0.4s ease; }
-        .badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
-        .badge-item { background: #fdfcfb; border: 1px solid #f0ede9; border-radius: 12px; padding: 8px 4px; text-align: center; font-size: 10px; opacity: 0.3; filter: grayscale(100%); }
-        .badge-active { opacity: 1; filter: grayscale(0%); background: #fffaf4; border-color: var(--accent-cat); }
-        .badge-icon { font-size: 22px; margin-bottom: 4px; }
-        .map-box { background: var(--card-color); border-radius: 20px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(74,63,53,0.04); border: 1px solid #f0ede9; text-align: center; }
-        .map-title { font-weight: bold; margin-bottom: 12px; display: flex; justify-content: center; align-items: center; gap: 5px; }
-        svg { width: 100%; height: auto; max-height: 280px; }
-        .clickable-region { fill: var(--unvisited); stroke: #ffffff; stroke-width: 1.2; cursor: pointer; }
-        .visited { fill: var(--visited-color) !important; }
-        .airport-dots { fill: #a69f96; cursor: pointer; }
-        .airport-active { fill: #5cb85c !important; }
-        .btn-back { background: #eae5df; border: none; padding: 8px 16px; border-radius: 20px; color: var(--text-main); font-weight: bold; cursor: pointer; margin-bottom: 15px; display: none; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--card-color); padding: 25px; border-radius: 24px; width: 85%; max-width: 360px; box-sizing: border-box; border: 1px solid #f0ede9; }
-        .modal h3 { margin-top: 0; }
-        .modal input, .modal textarea { width: 100%; border: 1px solid #e0dbd5; padding: 10px; border-radius: 10px; margin-top: 8px; box-sizing: border-box; font-family: inherit; background: #fafafd; }
-        .img-preview { width: 100%; max-height: 120px; object-fit: cover; border-radius: 10px; margin-top: 10px; display: none; }
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-save { background: var(--accent-cat); color: white; border: none; flex: 1; padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer; }
-        .btn-close { background: #eae5df; color: var(--text-main); border: none; flex: 1; padding: 10px; border-radius: 12px; font-weight: bold; cursor: pointer; }
-    </style>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/cat-face-emoji.png">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <!-- Google Fonts (Kanit & Mitr) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Paws on Map 🐾</h1>
-        <p>บันทึกรอยเท้าเจ้าเหมียวขูดสีเที่ยวรอบโลก</p>
+
+    <!-- Main Navigation Header -->
+    <header class="app-header">
+        <div class="header-brand">
+            <span class="logo-emoji">🐾</span>
+            <div>
+                <h1>Paws on Map</h1>
+                <p class="subtitle">รอยเท้าแมวบันทึกการเดินทางรอบโลก</p>
+            </div>
+        </div>
+
+        <!-- Breadcrumb & Control Navigation -->
+        <div class="nav-controls">
+            <button id="btn-back" class="btn-back hidden" onclick="goBackLevel()">
+                🔙 <span id="back-text">กลับระดับโลก</span>
+            </button>
+            <div class="continent-selector">
+                <label for="continent-filter">🌍 ทวีป:</label>
+                <select id="continent-filter" onchange="filterByContinent(this.value)">
+                    <option value="All">ทั้งหมด (Worldwide)</option>
+                    <option value="Asia">เอเชีย (Asia)</option>
+                    <option value="Europe">ยุโรป (Europe)</option>
+                    <option value="North America">อเมริกาเหนือ (N. America)</option>
+                    <option value="South America">อเมริกาใต้ (S. America)</option>
+                    <option value="Africa">แอฟริกา (Africa)</option>
+                    <option value="Oceania">โอเชียเนีย (Oceania)</option>
+                </select>
+            </div>
+        </div>
     </header>
-    <div class="container">
-        <div class="stats-card">
-            <div id="stats-title" style="font-weight: bold;">🐾 กำลังตรวจเช็กรอยเท้าแมว...</div>
-            <div class="progress-bg"><div class="progress-bar" id="total-progress"></div></div>
-            <div class="badge-grid">
-                <div class="badge-item" id="badge-asia"><div class="badge-icon">🍣</div><strong>ตะลุยเอเชีย</strong></div>
-                <div class="badge-item" id="badge-eu"><div class="badge-icon">🏰</div><strong>เหมียวปารีเซียง</strong></div>
-                <div class="badge-item" id="badge-us"><div class="badge-icon">🗽</div><strong>แมวเสรีภาพ</strong></div>
-                <div class="badge-item" id="badge-airport"><div class="badge-icon">✈️</div><strong>นักบินอวกาศ</strong></div>
-            </div>
+
+    <!-- Stats Bar & Badges Card -->
+    <section class="dashboard-panel">
+        <div class="stat-box">
+            <div class="stat-number" id="stat-provinces">0</div>
+            <div class="stat-label">จังหวัด/รัฐ ที่เคยไป 📍</div>
         </div>
-        <button class="btn-back" id="btn-back" onclick="loadWorldMap()">🔙 กลับสู่แผนที่โลก</button>
-        <div class="map-box">
-            <div class="map-title" id="current-map-title">🌍 แผนที่โลก (จิ้มโซนทวีป/ประเทศเพื่อซูมลึก)</div>
-            <div id="map-render-area"></div>
+        <div class="stat-box">
+            <div class="stat-number" id="stat-countries">0</div>
+            <div class="stat-label">ประเทศที่พิชิต 🌍</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="stat-airports">0</div>
+            <div class="stat-label">สนามบินที่เช็กอิน ✈️</div>
+        </div>
+        <div class="badges-wrapper">
+            <div class="badge" id="badge-asian" title="นักสำรวจแดนอาทิตย์อุทัย (ไปเอเชียอย่างน้อย 1 ประเทศ)">🍣 เอเชีย</div>
+            <div class="badge" id="badge-euro" title="อุ้งเท้าท่องยุโรป (ไปยุโรปอย่างน้อย 1 ประเทศ)">🏰 ยุโรป</div>
+            <div class="badge" id="badge-flyer" title="แมวเหินฟ้า (เช็กอินสนามบินครบ 3 แห่ง)">✈️ นักบินแมว</div>
+            <div class="badge" id="badge-master" title="แมวนักเดินทางรุ่นใหญ่ (พิชิต 10 จังหวัด/รัฐขึ้นไป)">👑 ตำนานอุ้งเท้า</div>
+        </div>
+    </section>
+
+    <!-- Leaflet Map Container -->
+    <div id="map"></div>
+
+    <!-- Travel Diary / Scratch Memory Modal -->
+    <div id="diaryModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="modal-close" onclick="closeDiaryModal()">✖</button>
+            <div class="modal-header">
+                <span class="modal-icon">🐾</span>
+                <h2 id="modal-title">บันทึกความทรงจำ</h2>
+            </div>
+            <p id="modal-subtitle" class="modal-subtitle">จังหวัด / บริเวณ</p>
+
+            <form id="diaryForm" onsubmit="saveMemory(event)">
+                <div class="form-group">
+                    <label for="travel-date">📅 วันที่ไปเยือน:</label>
+                    <input type="date" id="travel-date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="travel-note">📝 บันทึกความทรงจำ / สถานที่เที่ยว:</label>
+                    <textarea id="travel-note" rows="3" placeholder="เขียนความทรงจำสไตล์น้องแมวที่นี่..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="travel-img">📸 รูปภาพความทรงจำ:</label>
+                    <input type="file" id="travel-img" accept="image/*" onchange="previewImage(event)">
+                    <div id="img-preview-container" class="img-preview-container hidden">
+                        <img id="img-preview" src="" alt="ภาพความทรงจำ">
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-delete" id="btn-delete-memory" onclick="deleteMemory()">🗑️ ลบบันทึก</button>
+                    <button type="submit" class="btn-save">🐾 บันทึกความทรงจำ (Scratch!)</button>
+                </div>
+            </form>
         </div>
     </div>
-    <div class="modal" id="diary-modal">
-        <div class="modal-content">
-            <h3 id="modal-title">📌 บันทึกความทรงจำ</h3>
-            <label style="font-size: 13px; color: var(--text-sub);">วันที่เดินทาง</label>
-            <input type="date" id="travel-date">
-            <label style="font-size: 13px; color: var(--text-sub); margin-top: 10px; display:block;">บันทึก Itinerary / ความประทับใจ</label>
-            <textarea id="travel-note" rows="3" placeholder="เขียนเล่าเรื่องราวประทับใจไว้ตรงนี้เลยเหมียว..."></textarea>
-            <label style="font-size: 13px; color: var(--text-sub); margin-top: 10px; display:block;">📸 แปะรูปถ่าย (ย่อขนาดอัตโนมัติเปิดไวไม่ค้าง)</label>
-            <input type="file" id="travel-img" accept="image/*" onchange="previewAndCompressImage(event)">
-            <img id="img-view" class="img-preview">
-            <div class="btn-group">
-                <button class="btn-close" onclick="closeModal()">ปิด</button>
-                <button class="btn-save" onclick="saveDiaryData()">บันทึกเหมียว</button>
-            </div>
-        </div>
-    </div>
-<script>
-        let appData = JSON.parse(localStorage.getItem('pawsOnMapData')) || { visitedPlaces: [], airports: [], diaries: {} };
-        let currentActivePlaceId = ""; let currentView = "world";
 
-        const mapsData = {
-            world: `<svg viewBox="0 0 400 200">
-                <path id="AMERICA" class="clickable-region" d="M30,30 L90,40 L100,100 L50,150 L20,70 Z" />
-                <text x="35" y="75" font-size="10" fill="#666" pointer-events="none">อเมริกา 🗽</text>
-                <path id="EUROPE" class="clickable-region" d="M150,30 L210,35 L200,70 L150,60 Z" />
-                <text x="165" y="50" font-size="10" fill="#666" pointer-events="none">ยุโรป 🏰</text>
-                <path id="ASIA" class="clickable-region" d="M240,40 L340,45 L350,110 L250,130 Z" />
-                <text x="280" y="80" font-size="11" fill="#666" pointer-events="none">เอเชีย 🍣</text>
-            </svg>`,
-            ASIA: `<svg viewBox="0 0 350 220">
-                <path id="ASIA-TH" class="clickable-region" d="M90,130 L110,130 L115,160 L95,170 Z" />
-                <text x="75" y="150" font-size="10" fill="#333" pointer-events="none">ไทย 🇹🇭</text>
-                <path id="ASIA-CN" class="clickable-region" d="M90,60 L140,55 L160,100 L110,110 Z" />
-                <text x="110" y="85" font-size="11" fill="#333" pointer-events="none">จีน 🇨🇳</text>
-                <text x="215" y="80" font-size="10" fill="#333" pointer-events="none">ญี่ปุ่น 🇯🇵</text>
-                <text x="168" y="110" font-size="9" fill="#333" pointer-events="none">เกาหลี 🥢</text>
-                <text x="135" y="140" font-size="9" fill="#333" pointer-events="none">เวียดนาม ☕</text>
-                <circle id="AP-BKK" class="airport-dots" cx="100" cy="145" r="5" />
-                <text x="106" y="148" font-size="7" fill="#e6a15c" pointer-events="none">✈️ BKK</text>
-            </svg>`,
-            EUROPE: `<svg viewBox="0 0 300 200">
-                <path id="EU-FR" class="clickable-region" d="M60,80 L110,70 L120,110 L70,120 Z" />
-                <text x="75" y="100" font-size="12" fill="#333" pointer-events="none">ฝรั่งเศส (ปารีส)</text>
-                <path id="EU-UK" class="clickable-region" d="M50,30 L90,25 L100,55 L60,60 Z" />
-                <text x="62" y="45" font-size="11" fill="#333" pointer-events="none">อังกฤษ 🇬🇧</text>
-                <circle id="AP-CDG" class="airport-dots" cx="85" cy="85" r="5" />
-                <text x="92" y="88" font-size="8" fill="#e6a15c" pointer-events="none">✈️ CDG</text>
-            </svg>`,
-            AMERICA: `<svg viewBox="0 0 300 200">
-                <path id="US-NYC" class="clickable-region" d="M150,60 L240,50 L250,110 L160,120 Z" />
-                <text x="170" y="90" font-size="13" fill="#333" pointer-events="none">อเมริกา (นิวยอร์ก/LA)</text>
-                <circle id="AP-JFK" class="airport-dots" cx="210" cy="75" r="5" />
-                <text x="218" y="79" font-size="8" fill="#e6a15c" pointer-events="none">✈️ JFK</text>
-            </svg>`
-        };
-
-        function loadWorldMap() {
-            currentView = "world";
-            document.getElementById('btn-back').style.display = "none";
-            document.getElementById('current-map-title').innerText = "🌍 แผนที่โลก (จิ้มทวีปต่าง ๆ เพื่อลงลึก)";
-            document.getElementById('map-render-area').innerHTML = mapsData.world;
-            renderColors(); setupMapListeners();
-        }
-
-        function loadCountryMap(zoneId) {
-            currentView = "zone";
-            document.getElementById('btn-back').style.display = "block";
-            const zoneNames = { ASIA: "ภูมิภาคเอเชีย 🍣", EUROPE: "ภูมิภาคยุโรป 🏰", AMERICA: "ทวีปอเมริกา 🗽" };
-            document.getElementById('current-map-title').innerText = `🎯 เจาะลึก: ${zoneNames[zoneId] || zoneId}`;
-            document.getElementById('map-render-area').innerHTML = mapsData[zoneId] || `<p>กำลังเตรียมพิกัดพื้นที่เพิ่มเติมเหมียว...🐾</p>`;
-            renderColors(); setupMapListeners();
-        }
-
-        function setupMapListeners() {
-            document.querySelectorAll('.clickable-region').forEach(element => {
-                element.addEventListener('click', () => {
-                    const id = element.id;
-                    if (currentView === "world") { loadCountryMap(id); } else { openDiaryModal(id); }
-                });
-            });
-            document.querySelectorAll('.airport-dots').forEach(dot => {
-                dot.addEventListener('click', (e) => {
-                    e.stopPropagation(); const id = dot.id;
-                    if (appData.airports.includes(id)) { appData.airports = appData.airports.filter(a => a !== id); } else { appData.airports.push(id); }
-                    saveData(); renderColors();
-                });
-            });
-        }
-
-        function renderColors() {
-            document.querySelectorAll('.clickable-region').forEach(el => el.classList.remove('visited'));
-            document.querySelectorAll('.airport-dots').forEach(el => el.classList.remove('airport-active'));
-            appData.visitedPlaces.forEach(id => {
-                const el = document.getElementById(id); if (el) el.classList.add('visited');
-                if (currentView === "world") {
-                    let worldZoneId = "ASIA";
-                    if (id.startsWith("EU")) worldZoneId = "EUROPE";
-                    if (id.startsWith("US")) worldZoneId = "AMERICA";
-                    const worldEl = document.getElementById(worldZoneId); if (worldEl) worldEl.classList.add('visited');
-                }
-            });
-            appData.airports.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('airport-active'); });
-            updateStatsAndBadges();
-        }
-
-        function updateStatsAndBadges() {
-            const count = appData.visitedPlaces.length;
-            document.getElementById('stats-title').innerText = `🐾 คุณพาน้องแมวประทับรอยเท้าไปแล้ว ${count} เมืองทั่วโลก!`;
-            const progressPercent = Math.min((count / 8) * 100, 100);
-            document.getElementById('total-progress').style.width = `${progressPercent}%`;
-            if (appData.visitedPlaces.some(id => id.startsWith('ASIA'))) document.getElementById('badge-asia').classList.add('badge-active');
-            if (appData.visitedPlaces.some(id => id.startsWith('EU'))) document.getElementById('badge-eu').classList.add('badge-active');
-            if (appData.visitedPlaces.some(id => id.startsWith('US'))) document.getElementById('badge-us').classList.add('badge-active');
-            if (appData.airports.length >= 1) document.getElementById('badge-airport').classList.add('badge-active');
-        }
-
-        function openDiaryModal(placeId) {
-            currentActivePlaceId = placeId;
-            const readableNames = { "ASIA-TH": "ประเทศไทย", "ASIA-CN": "ประเทศจีน", "ASIA-JP": "ประเทศญี่ปุ่น", "ASIA-KR": "ประเทศเกาหลีใต้", "ASIA-VN": "ประเทศเวียดนาม", "EU-FR": "ฝรั่งเศส (ปารีส)", "EU-UK": "อังกฤษ (ลอนดอน)", "US-NYC": "อเมริกา" };
-            document.getElementById('modal-title').innerText = `📌 บันทึก ณ ${readableNames[placeId] || placeId}`;
-            const saved = appData.diaries[placeId] || { date: "", note: "", img: "" };
-            document.getElementById('travel-date').value = saved.date;
-            document.getElementById('travel-note').value = saved.note;
-            const imgView = document.getElementById('img-view');
-            if (saved.img) { imgView.src = saved.img; imgView.style.display = "block"; } else { imgView.style.display = "none"; }
-            document.getElementById('diary-modal').style.display = "flex";
-        }
-
-        function closeModal() { document.getElementById('diary-modal').style.display = "none"; }
-
-        function previewAndCompressImage(event) {
-            const file = event.target.files; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas'); const MAX_WIDTH = 400; const scale = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH; canvas.height = img.height * scale;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                    const imgView = document.getElementById('img-view'); imgView.src = compressedDataUrl; imgView.style.display = "block";
-                }
-                img.src = e.target.result;
-            }
-            reader.readAsDataURL(file);
-        }
-
-        function saveDiaryData() {
-            const date = document.getElementById('travel-date').value; const note = document.getElementById('travel-note').value; const img = document.getElementById('img-view').src || "";
-            if (!appData.visitedPlaces.includes(currentActivePlaceId)) { appData.visitedPlaces.push(currentActivePlaceId); }
-            appData.diaries[currentActivePlaceId] = { date, note, img };
-            saveData(); renderColors(); closeModal();
-        }
-
-        function saveData() { localStorage.setItem('pawsOnMapData', JSON.stringify(appData)); }
-
-        window.onload = function() { loadWorldMap(); };
-    </script>
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <!-- Custom Application JS -->
+    <script src="app.js"></script>
 </body>
 </html>
+:root {
+    --bg-color: #fdfbf7;
+    --header-bg: #fff8f0;
+    --card-bg: #ffffff;
+    --text-main: #4a3f35;
+    --text-muted: #8c7e74;
+    --accent-orange: #e6a15c;
+    --accent-pink: #ff5e7e;
+    --visited-fill: #ff8e9e;
+    --visited-stroke: #e64c65;
+    --unvisited-fill: #e0d7cb;
+    --border-color: #efe6d8;
+    --shadow-soft: 0 4px 15px rgba(74, 63, 53, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Kanit', sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header Navbar */
+.app-header {
+    background: var(--header-bg);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+    z-index: 1000;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-emoji {
+    font-size: 2rem;
+    background: #ffe3cb;
+    padding: 6px 10px;
+    border-radius: 50%;
+}
+
+.header-brand h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.header-brand .subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Navigation & Filter Buttons */
+.nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-back {
+    background: var(--accent-orange);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+    background: #d48b43;
+    transform: translateY(-1px);
+}
+
+.continent-selector select {
+    padding: 6px 12px;
+    border-radius: 15px;
+    border: 1.5px solid var(--accent-orange);
+    background: white;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Dashboard Panel */
+.dashboard-panel {
+    background: white;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 15px;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.stat-box {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--accent-pink);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.badges-wrapper {
+    display: flex;
+    gap: 8px;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    background: #f0ece1;
+    color: #999;
+    filter: grayscale(1);
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.badge.unlocked {
+    filter: grayscale(0);
+    opacity: 1;
+    background: #ffe5ec;
+    color: var(--accent-pink);
+    border: 1px solid var(--accent-pink);
+    font-weight: 500;
+}
+
+/* Map Styling */
+#map {
+    flex: 1;
+    width: 100%;
+    background-color: #cad2d3;
+}
+
+/* Leaflet Custom Airport Paw Marker */
+.paw-airport-icon {
+    background: white;
+    border: 2px solid var(--accent-orange);
+    border-radius: 50%;
+    text-align: center;
+    line-height: 26px;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(74, 63, 53, 0.4);
+    backdrop-filter: blur(3px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 15px;
+}
+
+.modal-card {
+    background: white;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px; right: 15px;
+    background: #f0ece1;
+    border: none;
+    border-radius: 50%;
+    width: 30px; height: 30px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-icon { font-size: 1.5rem; }
+.modal-title { font-size: 1.2rem; font-weight: 600; }
+.modal-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; }
+
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.form-group input, .form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border-color);
+    outline: none;
+    font-size: 0.9rem;
+}
+
+.form-group input:focus, .form-group textarea:focus {
+    border-color: var(--accent-orange);
+}
+
+.img-preview-container {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.img-preview-container img {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-save {
+    flex: 1;
+    background: var(--accent-pink);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-delete {
+    background: #f5f0eb;
+    color: #c0392b;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* Utilities */
+.hidden { display: none !important; }
+
+/* Responsive view for mobile */
+@media (max-width: 600px) {
+    .app-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .nav-controls { width: 100%; justify-content: space-between; }
+    .dashboard-panel { padding: 8px 10px; }
+    .badges-wrapper { flex-wrap: wrap; justify-content: center; }
+}
+/**
+ * Paws on Map 🐾 - Main Application Logic
+ */
+
+// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตจังหวัด/รัฐ (Admin-1)
+const WORLD_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson';
+const ADMIN1_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson';
+
+// 2. ฐานข้อมูลพิกัดสนามบินหลักรอบโลก ✈️
+const AIRPORT_DATABASE = [
+    { id: 'AP-BKK', code: 'BKK', name: 'Suvarnabhumi Airport (Thailand)', countryIso: 'THA', lat: 13.69, lng: 100.75 },
+    { id: 'AP-DMK', code: 'DMK', name: 'Don Mueang Airport (Thailand)', countryIso: 'THA', lat: 13.91, lng: 100.60 },
+    { id: 'AP-CNX', code: 'CNX', name: 'Chiang Mai Airport (Thailand)', countryIso: 'THA', lat: 18.77, lng: 98.96 },
+    { id: 'AP-HKT', code: 'HKT', name: 'Phuket Airport (Thailand)', countryIso: 'THA', lat: 8.11, lng: 98.31 },
+    { id: 'AP-HND', code: 'HND', name: 'Haneda Airport (Japan)', countryIso: 'JPN', lat: 35.54, lng: 139.77 },
+    { id: 'AP-NRT', code: 'NRT', name: 'Narita Airport (Japan)', countryIso: 'JPN', lat: 35.77, lng: 140.39 },
+    { id: 'AP-KIX', code: 'KIX', name: 'Kansai Airport (Japan)', countryIso: 'JPN', lat: 34.43, lng: 135.23 },
+    { id: 'AP-PEK', code: 'PEK', name: 'Beijing Capital (China)', countryIso: 'CHN', lat: 40.07, lng: 116.60 },
+    { id: 'AP-PVG', code: 'PVG', name: 'Shanghai Pudong (China)', countryIso: 'CHN', lat: 31.14, lng: 121.80 },
+    { id: 'AP-ICN', code: 'ICN', name: 'Incheon Airport (S. Korea)', countryIso: 'KOR', lat: 37.46, lng: 126.44 },
+    { id: 'AP-SIN', code: 'SIN', name: 'Changi Airport (Singapore)', countryIso: 'SGP', lat: 1.36, lng: 103.99 },
+    { id: 'AP-LHR', code: 'LHR', name: 'London Heathrow (UK)', countryIso: 'GBR', lat: 51.47, lng: -0.45 },
+    { id: 'AP-CDG', code: 'Charles de Gaulle (France)', countryIso: 'FRA', lat: 49.00, lng: 2.54 },
+    { id: 'AP-JFK', code: 'JFK Airport (USA)', countryIso: 'USA', lat: 40.64, lng: -73.77 },
+    { id: 'AP-LAX', code: 'LAX Airport (USA)', countryIso: 'USA', lat: 33.94, lng: -118.40 },
+    { id: 'AP-SYD', code: 'Sydney Airport (Australia)', countryIso: 'AUS', lat: -33.94, lng: 151.17 }
+];
+
+// App States
+let map;
+let admin0Data = null;
+let admin1Data = null;
+let currentLayer = null;
+let airportLayerGroup = L.layerGroup();
+
+let currentLevel = 'world'; // 'world' | 'continent' | 'country'
+let currentContinent = 'All';
+let currentSelectedCountryIso = null;
+let currentSelectedCountryName = '';
+let activeTargetId = null;
+
+// LocalStorage Persistence
+let userVisitedData = JSON.parse(localStorage.getItem('paws_visited_data')) || {};
+
+// Document Ready Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    loadGeoJSONData();
+});
+
+// Initialize Leaflet Map
+function initMap() {
+    map = L.map('map', {
+        center: [20, 10],
+        zoom: 3,
+        minZoom: 2,
+        maxZoom: 12
+    });
+
+    // Basemap: CartoDB Positron (Soft warm background)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    airportLayerGroup.addTo(map);
+}
+
+// Load GeoJSON Data asynchronously
+async function loadGeoJSONData() {
+    try {
+        const [res0, res1] = await Promise.all([
+            fetch(WORLD_GEOJSON_URL).then(r => r.json()),
+            fetch(ADMIN1_GEOJSON_URL).then(r => r.json())
+        ]);
+        
+        admin0Data = res0;
+        admin1Data = res1;
+
+        renderWorldLevel();
+        updateStatsAndBadges();
+    } catch (err) {
+        console.error('Failed to load GeoJSON map data:', err);
+        alert('เกิดข้อผิดพลาดในการโหลดข้อมูลแผนที่ กรุณารีเฟรชหน้าเว็บอีกครั้งค่ะ');
+    }
+}
+
+// -------------------------------------------------------------
+// LEVEL 1: Render World / Country Boundaries
+// -------------------------------------------------------------
+function renderWorldLevel() {
+    currentLevel = 'world';
+    currentSelectedCountryIso = null;
+    updateBackButton();
+
+    if (currentLayer) map.removeLayer(currentLayer);
+    airportLayerGroup.clearLayers();
+
+    // Filter features by continent
+    const filteredFeatures = admin0Data.features.filter(f => {
+        if (currentContinent === 'All') return true;
+        return f.properties.continent === currentContinent;
+    });
+
+    currentLayer = L.geoJSON({ type: 'FeatureCollection', features: filteredFeatures }, {
+        style: countryStyle,
+        onEachFeature: (feature, layer) => {
+            const countryName = feature.properties.name || feature.properties.admin;
+            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อเจาะลึกจังหวัด)`, { sticky: true });
+
+            layer.on({
+                mouseover: (e) => e.target.setStyle({ fillOpacity: 0.7, weight: 2 }),
+                mouseout: (e) => currentLayer.resetStyle(e.target),
+                click: (e) => {
+                    drillDownToCountry(feature, e.target);
+                }
+            });
+        }
+    }).addTo(map);
+
+    if (currentContinent === 'All') {
+        map.setView([20, 10], 3);
+    } else if (currentLayer.getBounds().isValid()) {
+        map.fitBounds(currentLayer.getBounds(), { padding: [20, 20] });
+    }
+}
+
+function countryStyle(feature) {
+    const iso = feature.properties.adm0_a3 || feature.properties.iso_a3;
+    const isVisited = hasVisitedChildOrCountry(iso, feature.properties.name);
+
+    return {
+        fillColor: isVisited ? '#ff8e9e' : '#d5cecf',
+        weight: 1,
+        opacity: 1,
+        color: '#ffffff',
+        fillOpacity: isVisited ? 0.75 : 0.5
+    };
+}
+
+// Helper: Check if country or any of its provinces have been visited
+function hasVisitedChildOrCountry(countryIso, countryName) {
+    return Object.keys(userVisitedData).some(key => {
+        const item = userVisitedData[key];
+        return item.countryIso === countryIso || item.countryName === countryName;
+    });
+}
+
+// -------------------------------------------------------------
+// LEVEL 2: Drill Down to Country Provinces / Admin-1
+// -------------------------------------------------------------
+function drillDownToCountry(countryFeature, layer) {
+    const props = countryFeature.properties;
+    currentSelectedCountryIso = props.adm0_a3 || props.iso_a3 || props.ISO_A3;
+    currentSelectedCountryName = props.name || props.admin;
+    currentLevel = 'country';
+    
+    updateBackButton();
+
+    // Filter Admin-1 Provinces for this country
+    const provinces = admin1Data.features.filter(f => {
+        const pIso = f.properties.adm0_a3 || f.properties.iso_a3;
+        const pAdmin = f.properties.admin || f.properties.name;
+        if (currentSelectedCountryIso && pIso && currentSelectedCountryIso === pIso) return true;
+        if (currentSelectedCountryName && pAdmin && currentSelectedCountryName.toLowerCase() === pAdmin.toLowerCase()) return true;
+        return false;
+    });
+
+    if (currentLayer) map.removeLayer(currentLayer);
+
+    // If province boundaries exist for this country
+    if (provinces.length > 0) {
+        currentLayer = L.geoJSON({ type: 'FeatureCollection', features: provinces }, {
+            style: provinceStyle,
+            onEachFeature: (feature, provinceLayer) => {
+                const provName = feature.properties.name || 'จังหวัด/เขต';
+                provinceLayer.bindTooltip(`📍 ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
+
+                provinceLayer.on({
+                    mouseover: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 2 }),
+                    mouseout: (e) => currentLayer.resetStyle(e.target),
+                    click: () => {
+                        const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
+                        openDiaryModal(provId, provName, 'province');
+                    }
+                });
+            }
+        }).addTo(map);
+    } else {
+        // Fallback: If no sub-provinces found, scratch the entire country
+        const countryId = `CTRY-${currentSelectedCountryIso}`;
+        openDiaryModal(countryId, currentSelectedCountryName, 'country');
+        renderWorldLevel();
+        return;
+    }
+
+    // Render Airports for this country
+    renderCountryAirports(currentSelectedCountryIso);
+
+    // Zoom map to fit country boundary
+    if (layer && layer.getBounds) {
+        map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+    }
+}
+
+function provinceStyle(feature) {
+    const provName = feature.properties.name;
+    const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
+    const isVisited = !!userVisitedData[provId];
+
+    return {
+        fillColor: isVisited ? '#ff5e7e' : '#e2d9cc',
+        weight: 1.5,
+        opacity: 1,
+        color: '#ffffff',
+        fillOpacity: isVisited ? 0.8 : 0.45
+    };
+}
+
+// Render Airport Markers
+function renderCountryAirports(countryIso) {
+    airportLayerGroup.clearLayers();
+    const airports = AIRPORT_DATABASE.filter(ap => ap.countryIso === countryIso);
+
+    airports.forEach(ap => {
+        const isVisited = !!userVisitedData[ap.id];
+        const iconHtml = `<div class="paw-airport-icon" style="border-color:${isVisited ? '#ff5e7e':'#e6a15c'}">✈️</div>`;
+        const customIcon = L.divIcon({
+            html: iconHtml,
+            className: 'custom-paw-marker',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        const marker = L.marker([ap.lat, ap.lng], { icon: customIcon });
+        marker.bindTooltip(`✈️ ${ap.name} (${ap.code})`, { sticky: true });
+        marker.on('click', () => {
+            openDiaryModal(ap.id, `${ap.name} (${ap.code})`, 'airport');
+        });
+        airportLayerGroup.addLayer(marker);
+    });
+}
+
+// -------------------------------------------------------------
+// Filter & Navigation Controls
+// -------------------------------------------------------------
+function filterByContinent(continent) {
+    currentContinent = continent;
+    renderWorldLevel();
+}
+
+function goBackLevel() {
+    if (currentLevel === 'country') {
+        renderWorldLevel();
+    }
+}
+
+function updateBackButton() {
+    const backBtn = document.getElementById('btn-back');
+    const backText = document.getElementById('back-text');
+    if (currentLevel === 'country') {
+        backBtn.classList.remove('hidden');
+        backText.textContent = `กลับสู่แผนที่โลก (จาก ${currentSelectedCountryName})`;
+    } else {
+        backBtn.classList.add('hidden');
+    }
+}
+
+// -------------------------------------------------------------
+// Scratch & Diary Modal Operations
+// -------------------------------------------------------------
+let currentBase64Image = '';
+
+function openDiaryModal(id, title, type) {
+    activeTargetId = id;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-subtitle').textContent = type === 'airport' ? 'สนามบิน / Airport' : 'จังหวัด / รัฐ';
+
+    const existing = userVisitedData[id];
+    if (existing) {
+        document.getElementById('travel-date').value = existing.date || '';
+        document.getElementById('travel-note').value = existing.note || '';
+        if (existing.img) {
+            currentBase64Image = existing.img;
+            document.getElementById('img-preview').src = existing.img;
+            document.getElementById('img-preview-container').classList.remove('hidden');
+        } else {
+            resetImagePreview();
+        }
+        document.getElementById('btn-delete-memory').classList.remove('hidden');
+    } else {
+        document.getElementById('diaryForm').reset();
+        resetImagePreview();
+        document.getElementById('travel-date').valueAsDate = new Date();
+        document.getElementById('btn-delete-memory').classList.add('hidden');
+    }
+
+    document.getElementById('diaryModal').classList.remove('hidden');
+}
+
+function closeDiaryModal() {
+    document.getElementById('diaryModal').classList.add('hidden');
+    activeTargetId = null;
+}
+
+function resetImagePreview() {
+    currentBase64Image = '';
+    document.getElementById('img-preview').src = '';
+    document.getElementById('img-preview-container').classList.add('hidden');
+}
+
+// Image compression via Canvas to stay clean in LocalStorage
+function previewImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxWidth = 500;
+            const scale = maxWidth / img.width;
+            
+            canvas.width = maxWidth;
+            canvas.height = img.height * scale;
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            currentBase64Image = canvas.toDataURL('image/jpeg', 0.6);
+
+            document.getElementById('img-preview').src = currentBase64Image;
+            document.getElementById('img-preview-container').classList.remove('hidden');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Save memory & apply Scratch color
+function saveMemory(e) {
+    e.preventDefault();
+    if (!activeTargetId) return;
+
+    userVisitedData[activeTargetId] = {
+        date: document.getElementById('travel-date').value,
+        note: document.getElementById('travel-note').value,
+        img: currentBase64Image,
+        countryIso: currentSelectedCountryIso,
+        countryName: currentSelectedCountryName,
+        timestamp: Date.now()
+    };
+
+    localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
+
+    // Refresh Map view styles & Statistics
+    if (currentLevel === 'country') {
+        currentLayer.eachLayer(l => currentLayer.resetStyle(l));
+        renderCountryAirports(currentSelectedCountryIso);
+    } else {
+        renderWorldLevel();
+    }
+
+    updateStatsAndBadges();
+    closeDiaryModal();
+}
+
+// Delete memory & remove Scratch color
+function deleteMemory() {
+    if (!activeTargetId) return;
+    delete userVisitedData[activeTargetId];
+    localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
+
+    if (currentLevel === 'country') {
+        currentLayer.eachLayer(l => currentLayer.resetStyle(l));
+        renderCountryAirports(currentSelectedCountryIso);
+    } else {
+        renderWorldLevel();
+    }
+
+    updateStatsAndBadges();
+    closeDiaryModal();
+}
+
+// -------------------------------------------------------------
+// Statistics & Badges Evaluator
+// -------------------------------------------------------------
+function updateStatsAndBadges() {
+    const keys = Object.keys(userVisitedData);
+
+    const provincesVisited = keys.filter(k => k.startsWith('PROV-')).length;
+    const airportsVisited = keys.filter(k => k.startsWith('AP-')).length;
+
+    const countriesVisitedSet = new Set();
+    keys.forEach(k => {
+        const item = userVisitedData[k];
+        if (item && item.countryName) {
+            countriesVisitedSet.add(item.countryName);
+        }
+    });
+
+    // Update Counters UI
+    document.getElementById('stat-provinces').textContent = provincesVisited;
+    document.getElementById('stat-countries').textContent = countriesVisitedSet.size;
+    document.getElementById('stat-airports').textContent = airportsVisited;
+
+    // Evaluate Badges
+    const badgeAsian = document.getElementById('badge-asian');
+    const badgeEuro = document.getElementById('badge-euro');
+    const badgeFlyer = document.getElementById('badge-flyer');
+    const badgeMaster = document.getElementById('badge-master');
+
+    // Check Asian countries (e.g. Thailand, Japan, China, S. Korea, Singapore, etc.)
+    const hasAsia = Array.from(countriesVisitedSet).some(c => ['Thailand', 'Japan', 'China', 'South Korea', 'Singapore'].includes(c));
+    badgeAsian.classList.toggle('unlocked', hasAsia);
+
+    // Check European countries (e.g. United Kingdom, France, Germany, Italy, Spain, etc.)
+    const hasEuro = Array.from(countriesVisitedSet).some(c => ['United Kingdom', 'France', 'Germany', 'Italy', 'Spain'].includes(c));
+    badgeEuro.classList.toggle('unlocked', hasEuro);
+
+    // Flyer Badge (≥ 3 Airports)
+    badgeFlyer.classList.toggle('unlocked', airportsVisited >= 3);
+
+    // Master Cat Badge (≥ 10 Provinces/States)
+    badgeMaster.classList.toggle('unlocked', provincesVisited >= 10);
+}
     
 
