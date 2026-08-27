@@ -3,7 +3,7 @@
  * Part 1: Global Constants, Data Loading, & World Level (Admin-0)
  */
 
-// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตเมือง (Admin-1)
+// 1. URLs สำหรับดึงข้อมูล GeoJSON
 const WORLD_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson';
 const ADMIN1_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson';
 
@@ -34,19 +34,30 @@ let admin1Data = null;
 let currentLayer = null;
 let airportLayerGroup = L.layerGroup();
 
-let currentLevel = 'world'; // 'world' | 'continent' | 'country'
+let currentLevel = 'world'; // 'world' | 'country'
 let currentContinent = 'All';
 let currentSelectedCountryIso = null;
 let currentSelectedCountryName = '';
 let activeTargetId = null;
 
 // LocalStorage Persistence
-let userVisitedData = JSON.parse(localStorage.getItem('paws_visited_data')) || {};
+let userVisitedData = {};
+try {
+    userVisitedData = JSON.parse(localStorage.getItem('paws_visited_data')) || {};
+} catch (e) {
+    userVisitedData = {};
+}
 
 // Document Ready Initialization
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     loadGeoJSONData();
+
+    // Bind Form Submit Event
+    const formEl = document.getElementById('diaryForm');
+    if (formEl) {
+        formEl.addEventListener('submit', saveMemory);
+    }
 });
 
 // Initialize Leaflet Map
@@ -97,21 +108,23 @@ function renderWorldLevel() {
     if (currentLayer) map.removeLayer(currentLayer);
     airportLayerGroup.clearLayers();
 
-    // Filter features by continent
     const filteredFeatures = admin0Data.features.filter(f => {
         if (currentContinent === 'All') return true;
-        return f.properties.continent === currentContinent;
+        return f.properties && f.properties.continent === currentContinent;
     });
 
     currentLayer = L.geoJSON({ type: 'FeatureCollection', features: filteredFeatures }, {
         style: countryStyle,
         onEachFeature: (feature, layer) => {
-            const countryName = feature.properties.name || feature.properties.admin;
-            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับเมือง)`, { sticky: true });
+            const countryName = (feature.properties && (feature.properties.name || feature.properties.admin)) || 'ประเทศ';
+            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับเมือง / มณฑล)`, { sticky: true });
 
             layer.on({
                 mouseover: (e) => e.target.setStyle({ fillOpacity: 0.7, weight: 2 }),
-                mouseout: (e) => currentLayer.resetStyle(e.target),
+                mouseout: (e) => {
+                    const style = countryStyle(e.target.feature);
+                    e.target.setStyle(style);
+                },
                 click: (e) => {
                     drillDownToCountry(feature, e.target);
                 }
@@ -127,6 +140,7 @@ function renderWorldLevel() {
 }
 
 function countryStyle(feature) {
+    if (!feature || !feature.properties) return { fillColor: '#d5cecf', weight: 1, color: '#ffffff', fillOpacity: 0.5 };
     const iso = feature.properties.adm0_a3 || feature.properties.iso_a3;
     const isVisited = hasVisitedChildOrCountry(iso, feature.properties.name);
 
@@ -139,11 +153,10 @@ function countryStyle(feature) {
     };
 }
 
-// Helper: Check if country or any of its cities have been visited
 function hasVisitedChildOrCountry(countryIso, countryName) {
     return Object.keys(userVisitedData).some(key => {
         const item = userVisitedData[key];
-        return item.countryIso === countryIso || item.countryName === countryName;
+        return item && (item.countryIso === countryIso || item.countryName === countryName);
     });
 }
 
@@ -152,9 +165,9 @@ function getCountryNameByIso(iso) {
     if (admin0Data && admin0Data.features) {
         const found = admin0Data.features.find(f => {
             const p = f.properties;
-            return (p.adm0_a3 || p.iso_a3) === iso;
+            return p && ((p.adm0_a3 || p.iso_a3) === iso);
         });
-        if (found) return found.properties.name || found.properties.admin;
+        if (found && found.properties) return found.properties.name || found.properties.admin;
     }
     return '';
 }
@@ -162,53 +175,46 @@ function getCountryNameByIso(iso) {
  * Part 2: Level 2 Drill-Down (City / Province Level & Subdivisions)
  */
 
-// Helper: ดึงชื่อเมืองอย่างสมบูรณ์แม่นยำ 100%
 function getProvinceName(feature) {
+    if (!feature || !feature.properties) return 'เมือง';
     const p = feature.properties;
-    return p.name || p.name_en || p.NAME_1 || p.NAME_0 || 'เขตการปกครอง';
+    return p.name || p.name_en || p.NAME_1 || p.NAME_0 || p.admin || 'เมือง';
 }
 
-// Helper: สร้าง ID ประจำเมืองให้ตรงกันทุกจุด
 function getProvinceId(feature, countryIso) {
     const name = getProvinceName(feature);
-    return `PROV-${countryIso}-${name}`;
+    const safeIso = countryIso || (feature && feature.properties ? (feature.properties.adm0_a3 || feature.properties.iso_a3) : 'GLOBAL');
+    return `PROV-${safeIso}-${name}`;
 }
 
-// Helper: แยกแยะประเภทเขตการปกครอง (จีน = มณฑล/นคร/เขตการปกครองพิเศษ, ประเทศอื่น = เมือง)
 function getSubdivisionTypeName(props, countryIso) {
-    // 🇨🇳 กรณีพิเศษสำหรับ ประเทศจีน / ฮ่องกง / มาเก๊า
+    if (!props) return 'เมือง';
     if (countryIso === 'CHN' || countryIso === 'HKG' || countryIso === 'MAC') {
         const rawType = (props.type || props.type_en || '').toLowerCase();
         const provName = (props.name || props.name_en || '').toLowerCase();
 
-        // เขตปกครองพิเศษ (ฮ่องกง / มาเก๊า)
         if (rawType.includes('special') || provName.includes('hong kong') || provName.includes('macau')) {
             return 'เขตการปกครองพิเศษ';
         }
-        // นครที่ขึ้นตรงต่อศูนย์กลาง (ปักกิ่ง, เซี่ยงไฮ้, ฉงชิ่ง, เทียนจิน)
         if (rawType.includes('municipality') || rawType.includes('city')) {
             return 'นคร';
         }
-        // มณฑลทั่วไป
         return 'มณฑล';
     }
-
-    // 🌍 ประเทศอื่นๆ ทั้งหมดในโลก ให้ส่งค่าเป็นคำว่า "เมือง"
     return 'เมือง';
 }
 
-// LEVEL 2: Drill Down to Cities / Provinces
 function drillDownToCountry(countryFeature, layer) {
-    const props = countryFeature.properties;
+    const props = countryFeature.properties || {};
     currentSelectedCountryIso = props.adm0_a3 || props.iso_a3 || props.ISO_A3;
-    currentSelectedCountryName = props.name || props.admin;
+    currentSelectedCountryName = props.name || props.admin || '';
     currentLevel = 'country';
     
     updateBackButton();
 
-    // Filter Admin-1 Cities for this country
     const provinces = admin1Data.features.filter(f => {
         const pProps = f.properties;
+        if (!pProps) return false;
         const pIso = pProps.adm0_a3 || pProps.iso_a3 || pProps.sov_a3 || pProps.gu_a3;
         const pAdmin = pProps.admin || pProps.sovereignt;
 
@@ -219,7 +225,6 @@ function drillDownToCountry(countryFeature, layer) {
 
     if (currentLayer) map.removeLayer(currentLayer);
 
-    // If city/province boundaries exist for this country
     if (provinces.length > 0) {
         currentLayer = L.geoJSON({ type: 'FeatureCollection', features: provinces }, {
             style: provinceStyle,
@@ -232,7 +237,11 @@ function drillDownToCountry(countryFeature, layer) {
 
                 provinceLayer.on({
                     mouseover: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 2 }),
-                    mouseout: (e) => currentLayer.resetStyle(e.target),
+                    mouseout: (e) => {
+                        // ป้องกัน Leaflet คืนสีเทาดั้งเดิม
+                        const style = provinceStyle(e.target.feature);
+                        e.target.setStyle(style);
+                    },
                     click: () => {
                         openDiaryModal(provId, provName, subTypeLabel);
                     }
@@ -240,23 +249,24 @@ function drillDownToCountry(countryFeature, layer) {
             }
         }).addTo(map);
     } else {
-        // Fallback: If no sub-cities found, scratch the entire country
         const countryId = `CTRY-${currentSelectedCountryIso}`;
         openDiaryModal(countryId, currentSelectedCountryName, 'ประเทศ');
         renderWorldLevel();
         return;
     }
 
-    // Render Airports for this country
     renderCountryAirports(currentSelectedCountryIso);
 
-    // Zoom map to fit country boundary
     if (layer && layer.getBounds) {
         map.fitBounds(layer.getBounds(), { padding: [30, 30] });
     }
 }
 
 function provinceStyle(feature) {
+    if (!feature || !feature.properties) {
+        return { fillColor: '#e2d9cc', weight: 1.5, color: '#ffffff', fillOpacity: 0.45 };
+    }
+
     const provId = getProvinceId(feature, currentSelectedCountryIso);
     const isVisited = !!userVisitedData[provId];
 
@@ -269,7 +279,6 @@ function provinceStyle(feature) {
     };
 }
 
-// Render Airport Markers
 function renderCountryAirports(countryIso) {
     airportLayerGroup.clearLayers();
     const airports = AIRPORT_DATABASE.filter(ap => ap.countryIso === countryIso);
@@ -293,7 +302,6 @@ function renderCountryAirports(countryIso) {
     });
 }
 
-// Filter & Navigation Controls
 function filterByContinent(continent) {
     currentContinent = continent;
     renderWorldLevel();
@@ -308,58 +316,77 @@ function goBackLevel() {
 function updateBackButton() {
     const backBtn = document.getElementById('btn-back');
     const backText = document.getElementById('back-text');
-    if (currentLevel === 'country') {
-        backBtn.classList.remove('hidden');
-        backText.textContent = `กลับสู่แผนที่โลก (จาก ${currentSelectedCountryName})`;
-    } else {
-        backBtn.classList.add('hidden');
+    if (backBtn && backText) {
+        if (currentLevel === 'country') {
+            backBtn.classList.remove('hidden');
+            backText.textContent = `กลับสู่แผนที่โลก (จาก ${currentSelectedCountryName})`;
+        } else {
+            backBtn.classList.add('hidden');
+        }
     }
 }
 /**
- * Part 3: Diary / Memory Modal Operations & Realtime Map Style Update
+ * Part 3: Memory Modal Operations & Safe Realtime Map Style Update
  */
 
 let currentBase64Image = '';
 
 function openDiaryModal(id, title, typeLabel) {
     activeTargetId = id;
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-subtitle').textContent = typeLabel || 'เมือง';
+
+    const titleEl = document.getElementById('modal-title');
+    const subtitleEl = document.getElementById('modal-subtitle');
+    if (titleEl) titleEl.textContent = title;
+    if (subtitleEl) subtitleEl.textContent = typeLabel || 'เมือง';
+
+    const dateEl = document.getElementById('travel-date');
+    const noteEl = document.getElementById('travel-note');
+    const imgPreviewEl = document.getElementById('img-preview');
+    const imgContainerEl = document.getElementById('img-preview-container');
+    const btnDeleteEl = document.getElementById('btn-delete-memory');
+    const formEl = document.getElementById('diaryForm');
 
     const existing = userVisitedData[id];
+
     if (existing) {
-        document.getElementById('travel-date').value = existing.date || '';
-        document.getElementById('travel-note').value = existing.note || '';
-        if (existing.img) {
+        if (dateEl) dateEl.value = existing.date || '';
+        if (noteEl) noteEl.value = existing.note || '';
+        if (existing.img && imgPreviewEl && imgContainerEl) {
             currentBase64Image = existing.img;
-            document.getElementById('img-preview').src = existing.img;
-            document.getElementById('img-preview-container').classList.remove('hidden');
+            imgPreviewEl.src = existing.img;
+            imgContainerEl.classList.remove('hidden');
         } else {
             resetImagePreview();
         }
-        document.getElementById('btn-delete-memory').classList.remove('hidden');
+        if (btnDeleteEl) btnDeleteEl.classList.remove('hidden');
     } else {
-        document.getElementById('diaryForm').reset();
+        if (formEl) formEl.reset();
         resetImagePreview();
-        document.getElementById('travel-date').valueAsDate = new Date();
-        document.getElementById('btn-delete-memory').classList.add('hidden');
+        if (dateEl) {
+            const today = new Date().toISOString().split('T')[0];
+            dateEl.value = today;
+        }
+        if (btnDeleteEl) btnDeleteEl.classList.add('hidden');
     }
 
-    document.getElementById('diaryModal').classList.remove('hidden');
+    const modalEl = document.getElementById('diaryModal');
+    if (modalEl) modalEl.classList.remove('hidden');
 }
 
 function closeDiaryModal() {
-    document.getElementById('diaryModal').classList.add('hidden');
+    const modalEl = document.getElementById('diaryModal');
+    if (modalEl) modalEl.classList.add('hidden');
     activeTargetId = null;
 }
 
 function resetImagePreview() {
     currentBase64Image = '';
-    document.getElementById('img-preview').src = '';
-    document.getElementById('img-preview-container').classList.add('hidden');
+    const imgPreviewEl = document.getElementById('img-preview');
+    const imgContainerEl = document.getElementById('img-preview-container');
+    if (imgPreviewEl) imgPreviewEl.src = '';
+    if (imgContainerEl) imgContainerEl.classList.add('hidden');
 }
 
-// Image compression via Canvas to stay clean in LocalStorage
 function previewImage(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -379,66 +406,83 @@ function previewImage(event) {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             currentBase64Image = canvas.toDataURL('image/jpeg', 0.6);
 
-            document.getElementById('img-preview').src = currentBase64Image;
-            document.getElementById('img-preview-container').classList.remove('hidden');
+            const imgPreviewEl = document.getElementById('img-preview');
+            const imgContainerEl = document.getElementById('img-preview-container');
+            if (imgPreviewEl && imgContainerEl) {
+                imgPreviewEl.src = currentBase64Image;
+                imgContainerEl.classList.remove('hidden');
+            }
         };
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
 }
 
-// Save memory & apply Scratch color in Realtime!
+// Save Memory function
 function saveMemory(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!activeTargetId) return;
 
+    const dateEl = document.getElementById('travel-date');
+    const noteEl = document.getElementById('travel-note');
     const cName = currentSelectedCountryName || getCountryNameByIso(currentSelectedCountryIso);
 
     userVisitedData[activeTargetId] = {
-        date: document.getElementById('travel-date').value,
-        note: document.getElementById('travel-note').value,
-        img: currentBase64Image,
+        date: dateEl ? dateEl.value : '',
+        note: noteEl ? noteEl.value : '',
+        img: currentBase64Image || '',
         countryIso: currentSelectedCountryIso,
         countryName: cName,
         timestamp: Date.now()
     };
 
-    localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
-
-    // Refresh Map view styles in Realtime
-    if (currentLevel === 'country' && currentLayer) {
-        currentLayer.setStyle(provinceStyle);
-        renderCountryAirports(currentSelectedCountryIso);
-    } else {
-        renderWorldLevel();
+    try {
+        localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
+    } catch (err) {
+        console.warn('LocalStorage limit reached:', err);
+        alert('รูปภาพมีขนาดใหญ่เกินไป ไม่สามารถบันทึกรูปได้ แต่ข้อมูลเมืองถูกบันทึกเรียบร้อยแล้วค่ะ');
     }
 
+    refreshMapStyles();
     updateStatsAndBadges();
     closeDiaryModal();
 }
 
-// Delete memory & remove Scratch color in Realtime!
 function deleteMemory() {
     if (!activeTargetId) return;
     delete userVisitedData[activeTargetId];
-    localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
 
-    if (currentLevel === 'country' && currentLayer) {
-        currentLayer.setStyle(provinceStyle);
-        renderCountryAirports(currentSelectedCountryIso);
-    } else {
-        renderWorldLevel();
+    try {
+        localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
+    } catch (err) {
+        console.warn('LocalStorage error:', err);
     }
 
+    refreshMapStyles();
     updateStatsAndBadges();
     closeDiaryModal();
 }
 
-// Statistics & Badges Evaluator
+// Re-apply styles on map dynamically
+function refreshMapStyles() {
+    if (currentLevel === 'country' && currentLayer) {
+        currentLayer.eachLayer(layer => {
+            if (layer.feature) {
+                const newStyle = provinceStyle(layer.feature);
+                layer.setStyle(newStyle);
+            }
+        });
+        renderCountryAirports(currentSelectedCountryIso);
+    } else {
+        renderWorldLevel();
+    }
+}
+
+// Update Stats UI & Badges
 function updateStatsAndBadges() {
     const keys = Object.keys(userVisitedData);
 
-    const provincesVisited = keys.filter(k => k.startsWith('PROV-')).length;
+    const citiesVisited = keys.filter(k => k.startsWith('PROV-')).length;
     const airportsVisited = keys.filter(k => k.startsWith('AP-')).length;
 
     const countriesVisitedSet = new Set();
@@ -449,28 +493,24 @@ function updateStatsAndBadges() {
         }
     });
 
-    // Update Counters UI
-    document.getElementById('stat-provinces').textContent = provincesVisited;
-    document.getElementById('stat-countries').textContent = countriesVisitedSet.size;
-    document.getElementById('stat-airports').textContent = airportsVisited;
+    const statProv = document.getElementById('stat-provinces');
+    const statCtry = document.getElementById('stat-countries');
+    const statAp = document.getElementById('stat-airports');
 
-    // Evaluate Badges
+    if (statProv) statProv.textContent = citiesVisited;
+    if (statCtry) statCtry.textContent = countriesVisitedSet.size;
+    if (statAp) statAp.textContent = airportsVisited;
+
     const badgeAsian = document.getElementById('badge-asian');
     const badgeEuro = document.getElementById('badge-euro');
     const badgeFlyer = document.getElementById('badge-flyer');
     const badgeMaster = document.getElementById('badge-master');
 
-    // Check Asian countries
     const hasAsia = Array.from(countriesVisitedSet).some(c => ['Thailand', 'Japan', 'China', 'South Korea', 'Singapore'].includes(c));
-    badgeAsian.classList.toggle('unlocked', hasAsia);
-
-    // Check European countries
     const hasEuro = Array.from(countriesVisitedSet).some(c => ['United Kingdom', 'France', 'Germany', 'Italy', 'Spain'].includes(c));
-    badgeEuro.classList.toggle('unlocked', hasEuro);
 
-    // Flyer Badge (≥ 3 Airports)
-    badgeFlyer.classList.toggle('unlocked', airportsVisited >= 3);
-
-    // Master Cat Badge (≥ 10 Cities)
-    badgeMaster.classList.toggle('unlocked', provincesVisited >= 10);
+    if (badgeAsian) badgeAsian.classList.toggle('unlocked', hasAsia);
+    if (badgeEuro) badgeEuro.classList.toggle('unlocked', hasEuro);
+    if (badgeFlyer) badgeFlyer.classList.toggle('unlocked', airportsVisited >= 3);
+    if (badgeMaster) badgeMaster.classList.toggle('unlocked', citiesVisited >= 10);
 }
