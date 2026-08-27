@@ -3,7 +3,7 @@
  * Part 1: Global Constants, Data Loading, & World Level (Admin-0)
  */
 
-// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตจังหวัด/รัฐ/มณฑล (Admin-1)
+// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตเมือง (Admin-1)
 const WORLD_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson';
 const ADMIN1_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson';
 
@@ -107,7 +107,7 @@ function renderWorldLevel() {
         style: countryStyle,
         onEachFeature: (feature, layer) => {
             const countryName = feature.properties.name || feature.properties.admin;
-            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับจังหวัด/รัฐ/มณฑล/นคร)`, { sticky: true });
+            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับเมือง)`, { sticky: true });
 
             layer.on({
                 mouseover: (e) => e.target.setStyle({ fillOpacity: 0.7, weight: 2 }),
@@ -139,7 +139,7 @@ function countryStyle(feature) {
     };
 }
 
-// Helper: Check if country or any of its provinces have been visited
+// Helper: Check if country or any of its cities have been visited
 function hasVisitedChildOrCountry(countryIso, countryName) {
     return Object.keys(userVisitedData).some(key => {
         const item = userVisitedData[key];
@@ -159,10 +159,45 @@ function getCountryNameByIso(iso) {
     return '';
 }
 /**
- * Part 2: Level 2 Drill-Down (Provinces / States / Prefectures / Municipalities) & Navigation Controls
+ * Part 2: Level 2 Drill-Down (City / Province Level & Subdivisions)
  */
 
-// LEVEL 2: Drill Down to Country Subdivisions (Admin-1: จังหวัด / รัฐ / มณฑล / นคร)
+// Helper: ดึงชื่อเมืองอย่างสมบูรณ์แม่นยำ 100%
+function getProvinceName(feature) {
+    const p = feature.properties;
+    return p.name || p.name_en || p.NAME_1 || p.NAME_0 || 'เขตการปกครอง';
+}
+
+// Helper: สร้าง ID ประจำเมืองให้ตรงกันทุกจุด
+function getProvinceId(feature, countryIso) {
+    const name = getProvinceName(feature);
+    return `PROV-${countryIso}-${name}`;
+}
+
+// Helper: แยกแยะประเภทเขตการปกครอง (จีน = มณฑล/นคร/เขตการปกครองพิเศษ, ประเทศอื่น = เมือง)
+function getSubdivisionTypeName(props, countryIso) {
+    // 🇨🇳 กรณีพิเศษสำหรับ ประเทศจีน / ฮ่องกง / มาเก๊า
+    if (countryIso === 'CHN' || countryIso === 'HKG' || countryIso === 'MAC') {
+        const rawType = (props.type || props.type_en || '').toLowerCase();
+        const provName = (props.name || props.name_en || '').toLowerCase();
+
+        // เขตปกครองพิเศษ (ฮ่องกง / มาเก๊า)
+        if (rawType.includes('special') || provName.includes('hong kong') || provName.includes('macau')) {
+            return 'เขตการปกครองพิเศษ';
+        }
+        // นครที่ขึ้นตรงต่อศูนย์กลาง (ปักกิ่ง, เซี่ยงไฮ้, ฉงชิ่ง, เทียนจิน)
+        if (rawType.includes('municipality') || rawType.includes('city')) {
+            return 'นคร';
+        }
+        // มณฑลทั่วไป
+        return 'มณฑล';
+    }
+
+    // 🌍 ประเทศอื่นๆ ทั้งหมดในโลก ให้ส่งค่าเป็นคำว่า "เมือง"
+    return 'เมือง';
+}
+
+// LEVEL 2: Drill Down to Cities / Provinces
 function drillDownToCountry(countryFeature, layer) {
     const props = countryFeature.properties;
     currentSelectedCountryIso = props.adm0_a3 || props.iso_a3 || props.ISO_A3;
@@ -171,7 +206,7 @@ function drillDownToCountry(countryFeature, layer) {
     
     updateBackButton();
 
-    // Filter Admin-1 (Provinces/States/Municipalities) for this country using strict & fallback matching
+    // Filter Admin-1 Cities for this country
     const provinces = admin1Data.features.filter(f => {
         const pProps = f.properties;
         const pIso = pProps.adm0_a3 || pProps.iso_a3 || pProps.sov_a3 || pProps.gu_a3;
@@ -184,29 +219,28 @@ function drillDownToCountry(countryFeature, layer) {
 
     if (currentLayer) map.removeLayer(currentLayer);
 
-    // If province/state/municipality boundaries exist for this country
+    // If city/province boundaries exist for this country
     if (provinces.length > 0) {
         currentLayer = L.geoJSON({ type: 'FeatureCollection', features: provinces }, {
             style: provinceStyle,
             onEachFeature: (feature, provinceLayer) => {
-                const provProps = feature.properties;
-                const provName = provProps.name || provProps.name_en || 'เขตการปกครอง';
-                const subTypeLabel = getSubdivisionTypeName(provProps, currentSelectedCountryIso);
+                const provName = getProvinceName(feature);
+                const provId = getProvinceId(feature, currentSelectedCountryIso);
+                const subTypeLabel = getSubdivisionTypeName(feature.properties, currentSelectedCountryIso);
 
-                provinceLayer.bindTooltip(`📍 เมือง ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
+                provinceLayer.bindTooltip(`📍 ${subTypeLabel} ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
 
                 provinceLayer.on({
                     mouseover: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 2 }),
                     mouseout: (e) => currentLayer.resetStyle(e.target),
                     click: () => {
-                        const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
-                        openDiaryModal(provId, `${provName}`, subTypeLabel);
+                        openDiaryModal(provId, provName, subTypeLabel);
                     }
                 });
             }
         }).addTo(map);
     } else {
-        // Fallback: If no sub-provinces found, scratch the entire country
+        // Fallback: If no sub-cities found, scratch the entire country
         const countryId = `CTRY-${currentSelectedCountryIso}`;
         openDiaryModal(countryId, currentSelectedCountryName, 'ประเทศ');
         renderWorldLevel();
@@ -222,32 +256,8 @@ function drillDownToCountry(countryFeature, layer) {
     }
 }
 
-// Helper: Determine subdivision type (จังหวัด / รัฐ / มณฑล / นคร / เขตการปกครอง)
-function getSubdivisionTypeName(props, countryIso) {
-    const rawType = (props.type || props.type_en || '').toLowerCase();
-    
-    if (countryIso === 'CHN' || countryIso === 'TWN') {
-        if (rawType.includes('municipality') || rawType.includes('city') || rawType.includes('special')) {
-            return 'นคร / เขตปกครองพิเศษ';
-        }
-        return 'มณฑล';
-    }
-    if (rawType.includes('state') || rawType.includes('canton') || rawType.includes('land')) {
-        return 'รัฐ';
-    }
-    if (rawType.includes('province') || rawType.includes('prefecture') || rawType.includes('governorate') || rawType.includes('department') || rawType.includes('oblast') || rawType.includes('region')) {
-        return countryIso === 'THA' ? 'จังหวัด' : 'จังหวัด / มณฑล';
-    }
-    if (rawType.includes('city') || rawType.includes('municipality') || rawType.includes('capital') || rawType.includes('federal district') || rawType.includes('metropolitan')) {
-        return 'นคร / เขตการปกครองพิเศษ';
-    }
-    
-    return 'จังหวัด / รัฐ / มณฑล';
-}
-
 function provinceStyle(feature) {
-    const provName = feature.properties.name || feature.properties.name_en;
-    const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
+    const provId = getProvinceId(feature, currentSelectedCountryIso);
     const isVisited = !!userVisitedData[provId];
 
     return {
@@ -306,7 +316,7 @@ function updateBackButton() {
     }
 }
 /**
- * Part 3: Diary / Memory Modal Operations & Statistics Evaluator
+ * Part 3: Diary / Memory Modal Operations & Realtime Map Style Update
  */
 
 let currentBase64Image = '';
@@ -314,12 +324,7 @@ let currentBase64Image = '';
 function openDiaryModal(id, title, typeLabel) {
     activeTargetId = id;
     document.getElementById('modal-title').textContent = title;
-    
-    let subtitleText = 'เมือง';
-    if (typeLabel) {
-        subtitleText = typeLabel;
-    }
-    document.getElementById('modal-subtitle').textContent = subtitleText;
+    document.getElementById('modal-subtitle').textContent = typeLabel || 'เมือง';
 
     const existing = userVisitedData[id];
     if (existing) {
@@ -382,7 +387,7 @@ function previewImage(event) {
     reader.readAsDataURL(file);
 }
 
-// Save memory & apply Scratch color
+// Save memory & apply Scratch color in Realtime!
 function saveMemory(e) {
     e.preventDefault();
     if (!activeTargetId) return;
@@ -400,9 +405,9 @@ function saveMemory(e) {
 
     localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
 
-    // Refresh Map view styles & Statistics
-    if (currentLevel === 'country') {
-        currentLayer.eachLayer(l => currentLayer.resetStyle(l));
+    // Refresh Map view styles in Realtime
+    if (currentLevel === 'country' && currentLayer) {
+        currentLayer.setStyle(provinceStyle);
         renderCountryAirports(currentSelectedCountryIso);
     } else {
         renderWorldLevel();
@@ -412,14 +417,14 @@ function saveMemory(e) {
     closeDiaryModal();
 }
 
-// Delete memory & remove Scratch color
+// Delete memory & remove Scratch color in Realtime!
 function deleteMemory() {
     if (!activeTargetId) return;
     delete userVisitedData[activeTargetId];
     localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
 
-    if (currentLevel === 'country') {
-        currentLayer.eachLayer(l => currentLayer.resetStyle(l));
+    if (currentLevel === 'country' && currentLayer) {
+        currentLayer.setStyle(provinceStyle);
         renderCountryAirports(currentSelectedCountryIso);
     } else {
         renderWorldLevel();
@@ -466,6 +471,6 @@ function updateStatsAndBadges() {
     // Flyer Badge (≥ 3 Airports)
     badgeFlyer.classList.toggle('unlocked', airportsVisited >= 3);
 
-    // Master Cat Badge (≥ 10 Provinces/States)
+    // Master Cat Badge (≥ 10 Cities)
     badgeMaster.classList.toggle('unlocked', provincesVisited >= 10);
 }
