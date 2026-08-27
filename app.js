@@ -3,7 +3,7 @@
  * Part 1: Global Constants, Data Loading, & World Level (Admin-0)
  */
 
-// 1. URLs สำหรับดึงข้อมูล GeoJSON
+// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตระดับเมือง/เขตปกครอง (Admin-1)
 const WORLD_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson';
 const ADMIN1_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson';
 
@@ -34,7 +34,7 @@ let admin1Data = null;
 let currentLayer = null;
 let airportLayerGroup = L.layerGroup();
 
-let currentLevel = 'world'; // 'world' | 'country'
+let currentLevel = 'world'; // 'world' | 'continent' | 'country'
 let currentContinent = 'All';
 let currentSelectedCountryIso = null;
 let currentSelectedCountryName = '';
@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     loadGeoJSONData();
 
-    // Bind Form Submit Event
     const formEl = document.getElementById('diaryForm');
     if (formEl) {
         formEl.addEventListener('submit', saveMemory);
@@ -108,6 +107,7 @@ function renderWorldLevel() {
     if (currentLayer) map.removeLayer(currentLayer);
     airportLayerGroup.clearLayers();
 
+    // Filter features by continent
     const filteredFeatures = admin0Data.features.filter(f => {
         if (currentContinent === 'All') return true;
         return f.properties && f.properties.continent === currentContinent;
@@ -117,13 +117,14 @@ function renderWorldLevel() {
         style: countryStyle,
         onEachFeature: (feature, layer) => {
             const countryName = (feature.properties && (feature.properties.name || feature.properties.admin)) || 'ประเทศ';
-            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับเมือง / มณฑล)`, { sticky: true });
+            // 📍 เปลี่ยนคำแสดงผลจาก "จังหวัด/รัฐ/มณฑล/นคร" เป็น "เมือง"
+            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับเมือง)`, { sticky: true });
 
             layer.on({
                 mouseover: (e) => e.target.setStyle({ fillOpacity: 0.7, weight: 2 }),
                 mouseout: (e) => {
-                    const style = countryStyle(e.target.feature);
-                    e.target.setStyle(style);
+                    const st = countryStyle(e.target.feature);
+                    e.target.setStyle(st);
                 },
                 click: (e) => {
                     drillDownToCountry(feature, e.target);
@@ -142,7 +143,8 @@ function renderWorldLevel() {
 function countryStyle(feature) {
     if (!feature || !feature.properties) return { fillColor: '#d5cecf', weight: 1, color: '#ffffff', fillOpacity: 0.5 };
     const iso = feature.properties.adm0_a3 || feature.properties.iso_a3;
-    const isVisited = hasVisitedChildOrCountry(iso, feature.properties.name);
+    const name = feature.properties.name || feature.properties.admin;
+    const isVisited = hasVisitedChildOrCountry(iso, name);
 
     return {
         fillColor: isVisited ? '#ff8e9e' : '#d5cecf',
@@ -153,10 +155,14 @@ function countryStyle(feature) {
     };
 }
 
+// Helper: Check if country or any of its cities have been visited
 function hasVisitedChildOrCountry(countryIso, countryName) {
     return Object.keys(userVisitedData).some(key => {
         const item = userVisitedData[key];
-        return item && (item.countryIso === countryIso || item.countryName === countryName);
+        if (!item) return false;
+        if (countryIso && item.countryIso === countryIso) return true;
+        if (countryName && item.countryName === countryName) return true;
+        return false;
     });
 }
 
@@ -165,45 +171,18 @@ function getCountryNameByIso(iso) {
     if (admin0Data && admin0Data.features) {
         const found = admin0Data.features.find(f => {
             const p = f.properties;
-            return p && ((p.adm0_a3 || p.iso_a3) === iso);
+            return (p.adm0_a3 || p.iso_a3) === iso;
         });
-        if (found && found.properties) return found.properties.name || found.properties.admin;
+        if (found) return found.properties.name || found.properties.admin;
     }
     return '';
 }
+
 /**
- * Part 2: Level 2 Drill-Down (City / Province Level & Subdivisions)
+ * Part 2: Level 2 Drill-Down (City Level) & Navigation Controls
  */
 
-function getProvinceName(feature) {
-    if (!feature || !feature.properties) return 'เมือง';
-    const p = feature.properties;
-    return p.name || p.name_en || p.NAME_1 || p.NAME_0 || p.admin || 'เมือง';
-}
-
-function getProvinceId(feature, countryIso) {
-    const name = getProvinceName(feature);
-    const safeIso = countryIso || (feature && feature.properties ? (feature.properties.adm0_a3 || feature.properties.iso_a3) : 'GLOBAL');
-    return `PROV-${safeIso}-${name}`;
-}
-
-function getSubdivisionTypeName(props, countryIso) {
-    if (!props) return 'เมือง';
-    if (countryIso === 'CHN' || countryIso === 'HKG' || countryIso === 'MAC') {
-        const rawType = (props.type || props.type_en || '').toLowerCase();
-        const provName = (props.name || props.name_en || '').toLowerCase();
-
-        if (rawType.includes('special') || provName.includes('hong kong') || provName.includes('macau')) {
-            return 'เขตการปกครองพิเศษ';
-        }
-        if (rawType.includes('municipality') || rawType.includes('city')) {
-            return 'นคร';
-        }
-        return 'มณฑล';
-    }
-    return 'เมือง';
-}
-
+// LEVEL 2: Drill Down to Country Subdivisions (Admin-1: เมือง)
 function drillDownToCountry(countryFeature, layer) {
     const props = countryFeature.properties || {};
     currentSelectedCountryIso = props.adm0_a3 || props.iso_a3 || props.ISO_A3;
@@ -212,54 +191,65 @@ function drillDownToCountry(countryFeature, layer) {
     
     updateBackButton();
 
+    // ค้นหาเมืองแบบยืดหยุ่น (ตรวจสอบทั้ง ISO Code และ ชื่อประเทศ)
     const provinces = admin1Data.features.filter(f => {
         const pProps = f.properties;
         if (!pProps) return false;
-        const pIso = pProps.adm0_a3 || pProps.iso_a3 || pProps.sov_a3 || pProps.gu_a3;
-        const pAdmin = pProps.admin || pProps.sovereignt;
 
-        if (currentSelectedCountryIso && pIso && currentSelectedCountryIso.toUpperCase() === pIso.toUpperCase()) return true;
-        if (currentSelectedCountryName && pAdmin && currentSelectedCountryName.toLowerCase() === pAdmin.toLowerCase()) return true;
-        return false;
+        const pIso = (pProps.adm0_a3 || pProps.iso_a3 || pProps.sov_a3 || pProps.gu_a3 || '').toUpperCase();
+        const pAdmin = (pProps.admin || pProps.sovereignt || pProps.name_0 || '').toLowerCase();
+
+        const matchIso = currentSelectedCountryIso && pIso && (pIso === currentSelectedCountryIso.toUpperCase());
+        const matchName = currentSelectedCountryName && pAdmin && (pAdmin === currentSelectedCountryName.toLowerCase());
+
+        return matchIso || matchName;
     });
 
     if (currentLayer) map.removeLayer(currentLayer);
 
+    // หากพบเขตการปกครองเมืองของประเทศนี้
     if (provinces.length > 0) {
         currentLayer = L.geoJSON({ type: 'FeatureCollection', features: provinces }, {
             style: provinceStyle,
             onEachFeature: (feature, provinceLayer) => {
-                const provName = getProvinceName(feature);
-                const provId = getProvinceId(feature, currentSelectedCountryIso);
-                const subTypeLabel = getSubdivisionTypeName(feature.properties, currentSelectedCountryIso);
+                const provProps = feature.properties || {};
+                const provName = provProps.name || provProps.name_en || provProps.NAME_1 || 'เมือง';
+                const subTypeLabel = getSubdivisionTypeName(provProps, currentSelectedCountryIso);
 
+                // 📍 แสดง Tooltip เป็นระดับ "เมือง"
                 provinceLayer.bindTooltip(`📍 ${subTypeLabel} ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
 
                 provinceLayer.on({
                     mouseover: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 2 }),
                     mouseout: (e) => {
-                        // ป้องกัน Leaflet คืนสีเทาดั้งเดิม
-                        const style = provinceStyle(e.target.feature);
-                        e.target.setStyle(style);
+                        const st = provinceStyle(e.target.feature);
+                        e.target.setStyle(st);
                     },
                     click: () => {
-                        openDiaryModal(provId, provName, subTypeLabel);
+                        const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
+                        openDiaryModal(provId, `${provName}`, subTypeLabel);
                     }
                 });
             }
         }).addTo(map);
     } else {
-        const countryId = `CTRY-${currentSelectedCountryIso}`;
-        openDiaryModal(countryId, currentSelectedCountryName, 'ประเทศ');
-        renderWorldLevel();
-        return;
+        // กรณีประเทศนั้นไม่มีขอบเขตเมืองย่อยใน GeoJSON
+        const countryId = `PROV-${currentSelectedCountryIso}-${currentSelectedCountryName}`;
+        openDiaryModal(countryId, currentSelectedCountryName, 'เมือง');
     }
 
+    // Render Airports for this country
     renderCountryAirports(currentSelectedCountryIso);
 
+    // Zoom map to fit country boundary
     if (layer && layer.getBounds) {
         map.fitBounds(layer.getBounds(), { padding: [30, 30] });
     }
+}
+
+// 📍 Helper: คืนค่าคำว่า "เมือง" สำหรับทุกระดับพื้นที่
+function getSubdivisionTypeName(props, countryIso) {
+    return 'เมือง';
 }
 
 function provinceStyle(feature) {
@@ -267,7 +257,8 @@ function provinceStyle(feature) {
         return { fillColor: '#e2d9cc', weight: 1.5, color: '#ffffff', fillOpacity: 0.45 };
     }
 
-    const provId = getProvinceId(feature, currentSelectedCountryIso);
+    const provName = feature.properties.name || feature.properties.name_en || feature.properties.NAME_1 || 'เมือง';
+    const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
     const isVisited = !!userVisitedData[provId];
 
     return {
@@ -275,10 +266,11 @@ function provinceStyle(feature) {
         weight: 1.5,
         opacity: 1,
         color: '#ffffff',
-        fillOpacity: isVisited ? 0.8 : 0.45
+        fillOpacity: isVisited ? 0.85 : 0.45
     };
 }
 
+// Render Airport Markers
 function renderCountryAirports(countryIso) {
     airportLayerGroup.clearLayers();
     const airports = AIRPORT_DATABASE.filter(ap => ap.countryIso === countryIso);
@@ -296,12 +288,13 @@ function renderCountryAirports(countryIso) {
         const marker = L.marker([ap.lat, ap.lng], { icon: customIcon });
         marker.bindTooltip(`✈️ ${ap.name} (${ap.code})`, { sticky: true });
         marker.on('click', () => {
-            openDiaryModal(ap.id, `${ap.name} (${ap.code})`, 'สนามบิน / Airport');
+            openDiaryModal(ap.id, `${ap.name} (${ap.code})`, 'สนามบิน');
         });
         airportLayerGroup.addLayer(marker);
     });
 }
 
+// Filter & Navigation Controls
 function filterByContinent(continent) {
     currentContinent = continent;
     renderWorldLevel();
@@ -325,19 +318,26 @@ function updateBackButton() {
         }
     }
 }
+
 /**
- * Part 3: Memory Modal Operations & Safe Realtime Map Style Update
+ * Part 3: Diary / Memory Modal Operations & Statistics Evaluator
  */
 
 let currentBase64Image = '';
 
 function openDiaryModal(id, title, typeLabel) {
     activeTargetId = id;
-
     const titleEl = document.getElementById('modal-title');
     const subtitleEl = document.getElementById('modal-subtitle');
+    
     if (titleEl) titleEl.textContent = title;
-    if (subtitleEl) subtitleEl.textContent = typeLabel || 'เมือง';
+    
+    // 📍 กำหนดค่าเริ่มต้นข้อความย่อยให้เป็น "เมือง"
+    let subtitleText = 'เมือง';
+    if (typeLabel) {
+        subtitleText = typeLabel;
+    }
+    if (subtitleEl) subtitleEl.textContent = subtitleText;
 
     const dateEl = document.getElementById('travel-date');
     const noteEl = document.getElementById('travel-note');
@@ -418,14 +418,14 @@ function previewImage(event) {
     reader.readAsDataURL(file);
 }
 
-// Save Memory function
+// Save memory & apply Scratch color
 function saveMemory(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (!activeTargetId) return;
 
+    const cName = currentSelectedCountryName || getCountryNameByIso(currentSelectedCountryIso);
     const dateEl = document.getElementById('travel-date');
     const noteEl = document.getElementById('travel-note');
-    const cName = currentSelectedCountryName || getCountryNameByIso(currentSelectedCountryIso);
 
     userVisitedData[activeTargetId] = {
         date: dateEl ? dateEl.value : '',
@@ -439,15 +439,16 @@ function saveMemory(e) {
     try {
         localStorage.setItem('paws_visited_data', JSON.stringify(userVisitedData));
     } catch (err) {
-        console.warn('LocalStorage limit reached:', err);
-        alert('รูปภาพมีขนาดใหญ่เกินไป ไม่สามารถบันทึกรูปได้ แต่ข้อมูลเมืองถูกบันทึกเรียบร้อยแล้วค่ะ');
+        console.warn('LocalStorage error:', err);
     }
 
+    // Refresh Map view styles & Statistics
     refreshMapStyles();
     updateStatsAndBadges();
     closeDiaryModal();
 }
 
+// Delete memory & remove Scratch color
 function deleteMemory() {
     if (!activeTargetId) return;
     delete userVisitedData[activeTargetId];
@@ -463,7 +464,7 @@ function deleteMemory() {
     closeDiaryModal();
 }
 
-// Re-apply styles on map dynamically
+// วนลูปอัปเดตสีแผนที่ ณ ปัจจุบัน
 function refreshMapStyles() {
     if (currentLevel === 'country' && currentLayer) {
         currentLayer.eachLayer(layer => {
@@ -473,12 +474,17 @@ function refreshMapStyles() {
             }
         });
         renderCountryAirports(currentSelectedCountryIso);
-    } else {
-        renderWorldLevel();
+    } else if (currentLayer) {
+        currentLayer.eachLayer(layer => {
+            if (layer.feature) {
+                const newStyle = countryStyle(layer.feature);
+                layer.setStyle(newStyle);
+            }
+        });
     }
 }
 
-// Update Stats UI & Badges
+// Statistics & Badges Evaluator
 function updateStatsAndBadges() {
     const keys = Object.keys(userVisitedData);
 
@@ -488,11 +494,12 @@ function updateStatsAndBadges() {
     const countriesVisitedSet = new Set();
     keys.forEach(k => {
         const item = userVisitedData[k];
-        if (item && item.countryName) {
+        if (item && item.countryName && item.countryName !== '') {
             countriesVisitedSet.add(item.countryName);
         }
     });
 
+    // Update Counters UI
     const statProv = document.getElementById('stat-provinces');
     const statCtry = document.getElementById('stat-countries');
     const statAp = document.getElementById('stat-airports');
@@ -501,6 +508,7 @@ function updateStatsAndBadges() {
     if (statCtry) statCtry.textContent = countriesVisitedSet.size;
     if (statAp) statAp.textContent = airportsVisited;
 
+    // Evaluate Badges
     const badgeAsian = document.getElementById('badge-asian');
     const badgeEuro = document.getElementById('badge-euro');
     const badgeFlyer = document.getElementById('badge-flyer');
