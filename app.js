@@ -1,8 +1,9 @@
 /**
- * Paws on Map 🐾 - Main Application Logic
+ * Paws on Map 🐾 - Main Application Logic (app.js)
+ * Part 1: Global Constants, Data Loading, & World Level (Admin-0)
  */
 
-// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตจังหวัด/รัฐ (Admin-1)
+// 1. URLs สำหรับดึงข้อมูล GeoJSON ขอบเขตประเทศ (Admin-0) และ ขอบเขตจังหวัด/รัฐ/มณฑล (Admin-1)
 const WORLD_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson';
 const ADMIN1_GEOJSON_URL = 'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson';
 
@@ -20,10 +21,10 @@ const AIRPORT_DATABASE = [
     { id: 'AP-ICN', code: 'ICN', name: 'Incheon Airport (S. Korea)', countryIso: 'KOR', lat: 37.46, lng: 126.44 },
     { id: 'AP-SIN', code: 'SIN', name: 'Changi Airport (Singapore)', countryIso: 'SGP', lat: 1.36, lng: 103.99 },
     { id: 'AP-LHR', code: 'LHR', name: 'London Heathrow (UK)', countryIso: 'GBR', lat: 51.47, lng: -0.45 },
-    { id: 'AP-CDG', code: 'Charles de Gaulle (France)', countryIso: 'FRA', lat: 49.00, lng: 2.54 },
-    { id: 'AP-JFK', code: 'JFK Airport (USA)', countryIso: 'USA', lat: 40.64, lng: -73.77 },
-    { id: 'AP-LAX', code: 'LAX Airport (USA)', countryIso: 'USA', lat: 33.94, lng: -118.40 },
-    { id: 'AP-SYD', code: 'Sydney Airport (Australia)', countryIso: 'AUS', lat: -33.94, lng: 151.17 }
+    { id: 'AP-CDG', code: 'CDG', name: 'Charles de Gaulle (France)', countryIso: 'FRA', lat: 49.00, lng: 2.54 },
+    { id: 'AP-JFK', code: 'JFK', name: 'JFK Airport (USA)', countryIso: 'USA', lat: 40.64, lng: -73.77 },
+    { id: 'AP-LAX', code: 'LAX', name: 'LAX Airport (USA)', countryIso: 'USA', lat: 33.94, lng: -118.40 },
+    { id: 'AP-SYD', code: 'SYD', name: 'Sydney Airport (Australia)', countryIso: 'AUS', lat: -33.94, lng: 151.17 }
 ];
 
 // App States
@@ -57,7 +58,7 @@ function initMap() {
         maxZoom: 12
     });
 
-    // Basemap: CartoDB Positron (Soft warm background)
+    // Basemap: CartoDB Positron
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO',
         subdomains: 'abcd',
@@ -86,12 +87,11 @@ async function loadGeoJSONData() {
     }
 }
 
-// -------------------------------------------------------------
 // LEVEL 1: Render World / Country Boundaries
-// -------------------------------------------------------------
 function renderWorldLevel() {
     currentLevel = 'world';
     currentSelectedCountryIso = null;
+    currentSelectedCountryName = '';
     updateBackButton();
 
     if (currentLayer) map.removeLayer(currentLayer);
@@ -107,7 +107,7 @@ function renderWorldLevel() {
         style: countryStyle,
         onEachFeature: (feature, layer) => {
             const countryName = feature.properties.name || feature.properties.admin;
-            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อเจาะลึกจังหวัด)`, { sticky: true });
+            layer.bindTooltip(`🐾 ${countryName} (คลิกเพื่อดูระดับจังหวัด/รัฐ/มณฑล/นคร)`, { sticky: true });
 
             layer.on({
                 mouseover: (e) => e.target.setStyle({ fillOpacity: 0.7, weight: 2 }),
@@ -147,9 +147,22 @@ function hasVisitedChildOrCountry(countryIso, countryName) {
     });
 }
 
-// -------------------------------------------------------------
-// LEVEL 2: Drill Down to Country Provinces / Admin-1
-// -------------------------------------------------------------
+function getCountryNameByIso(iso) {
+    if (!iso) return '';
+    if (admin0Data && admin0Data.features) {
+        const found = admin0Data.features.find(f => {
+            const p = f.properties;
+            return (p.adm0_a3 || p.iso_a3) === iso;
+        });
+        if (found) return found.properties.name || found.properties.admin;
+    }
+    return '';
+}
+/**
+ * Part 2: Level 2 Drill-Down (Provinces / States / Prefectures / Municipalities) & Navigation Controls
+ */
+
+// LEVEL 2: Drill Down to Country Subdivisions (Admin-1: จังหวัด / รัฐ / มณฑล / นคร)
 function drillDownToCountry(countryFeature, layer) {
     const props = countryFeature.properties;
     currentSelectedCountryIso = props.adm0_a3 || props.iso_a3 || props.ISO_A3;
@@ -158,31 +171,36 @@ function drillDownToCountry(countryFeature, layer) {
     
     updateBackButton();
 
-    // Filter Admin-1 Provinces for this country
+    // Filter Admin-1 (Provinces/States/Municipalities) for this country using strict & fallback matching
     const provinces = admin1Data.features.filter(f => {
-        const pIso = f.properties.adm0_a3 || f.properties.iso_a3;
-        const pAdmin = f.properties.admin || f.properties.name;
-        if (currentSelectedCountryIso && pIso && currentSelectedCountryIso === pIso) return true;
+        const pProps = f.properties;
+        const pIso = pProps.adm0_a3 || pProps.iso_a3 || pProps.sov_a3 || pProps.gu_a3;
+        const pAdmin = pProps.admin || pProps.sovereignt;
+
+        if (currentSelectedCountryIso && pIso && currentSelectedCountryIso.toUpperCase() === pIso.toUpperCase()) return true;
         if (currentSelectedCountryName && pAdmin && currentSelectedCountryName.toLowerCase() === pAdmin.toLowerCase()) return true;
         return false;
     });
 
     if (currentLayer) map.removeLayer(currentLayer);
 
-    // If province boundaries exist for this country
+    // If province/state/municipality boundaries exist for this country
     if (provinces.length > 0) {
         currentLayer = L.geoJSON({ type: 'FeatureCollection', features: provinces }, {
             style: provinceStyle,
             onEachFeature: (feature, provinceLayer) => {
-                const provName = feature.properties.name || 'จังหวัด/เขต';
-                provinceLayer.bindTooltip(`📍 ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
+                const provProps = feature.properties;
+                const provName = provProps.name || provProps.name_en || 'เขตการปกครอง';
+                const subTypeLabel = getSubdivisionTypeName(provProps, currentSelectedCountryIso);
+
+                provinceLayer.bindTooltip(`📍 เมือง ${provName} (คลิกเพื่อบันทึกความทรงจำ)`, { sticky: true });
 
                 provinceLayer.on({
                     mouseover: (e) => e.target.setStyle({ fillOpacity: 0.85, weight: 2 }),
                     mouseout: (e) => currentLayer.resetStyle(e.target),
                     click: () => {
                         const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
-                        openDiaryModal(provId, provName, 'province');
+                        openDiaryModal(provId, `${provName}`, subTypeLabel);
                     }
                 });
             }
@@ -190,7 +208,7 @@ function drillDownToCountry(countryFeature, layer) {
     } else {
         // Fallback: If no sub-provinces found, scratch the entire country
         const countryId = `CTRY-${currentSelectedCountryIso}`;
-        openDiaryModal(countryId, currentSelectedCountryName, 'country');
+        openDiaryModal(countryId, currentSelectedCountryName, 'ประเทศ');
         renderWorldLevel();
         return;
     }
@@ -204,8 +222,31 @@ function drillDownToCountry(countryFeature, layer) {
     }
 }
 
+// Helper: Determine subdivision type (จังหวัด / รัฐ / มณฑล / นคร / เขตการปกครอง)
+function getSubdivisionTypeName(props, countryIso) {
+    const rawType = (props.type || props.type_en || '').toLowerCase();
+    
+    if (countryIso === 'CHN' || countryIso === 'TWN') {
+        if (rawType.includes('municipality') || rawType.includes('city') || rawType.includes('special')) {
+            return 'นคร / เขตปกครองพิเศษ';
+        }
+        return 'มณฑล';
+    }
+    if (rawType.includes('state') || rawType.includes('canton') || rawType.includes('land')) {
+        return 'รัฐ';
+    }
+    if (rawType.includes('province') || rawType.includes('prefecture') || rawType.includes('governorate') || rawType.includes('department') || rawType.includes('oblast') || rawType.includes('region')) {
+        return countryIso === 'THA' ? 'จังหวัด' : 'จังหวัด / มณฑล';
+    }
+    if (rawType.includes('city') || rawType.includes('municipality') || rawType.includes('capital') || rawType.includes('federal district') || rawType.includes('metropolitan')) {
+        return 'นคร / เขตการปกครองพิเศษ';
+    }
+    
+    return 'จังหวัด / รัฐ / มณฑล';
+}
+
 function provinceStyle(feature) {
-    const provName = feature.properties.name;
+    const provName = feature.properties.name || feature.properties.name_en;
     const provId = `PROV-${currentSelectedCountryIso}-${provName}`;
     const isVisited = !!userVisitedData[provId];
 
@@ -236,15 +277,13 @@ function renderCountryAirports(countryIso) {
         const marker = L.marker([ap.lat, ap.lng], { icon: customIcon });
         marker.bindTooltip(`✈️ ${ap.name} (${ap.code})`, { sticky: true });
         marker.on('click', () => {
-            openDiaryModal(ap.id, `${ap.name} (${ap.code})`, 'airport');
+            openDiaryModal(ap.id, `${ap.name} (${ap.code})`, 'สนามบิน / Airport');
         });
         airportLayerGroup.addLayer(marker);
     });
 }
 
-// -------------------------------------------------------------
 // Filter & Navigation Controls
-// -------------------------------------------------------------
 function filterByContinent(continent) {
     currentContinent = continent;
     renderWorldLevel();
@@ -266,16 +305,21 @@ function updateBackButton() {
         backBtn.classList.add('hidden');
     }
 }
+/**
+ * Part 3: Diary / Memory Modal Operations & Statistics Evaluator
+ */
 
-// -------------------------------------------------------------
-// Scratch & Diary Modal Operations
-// -------------------------------------------------------------
 let currentBase64Image = '';
 
-function openDiaryModal(id, title, type) {
+function openDiaryModal(id, title, typeLabel) {
     activeTargetId = id;
     document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-subtitle').textContent = type === 'airport' ? 'สนามบิน / Airport' : 'จังหวัด / รัฐ';
+    
+    let subtitleText = 'เมือง';
+    if (typeLabel) {
+        subtitleText = typeLabel;
+    }
+    document.getElementById('modal-subtitle').textContent = subtitleText;
 
     const existing = userVisitedData[id];
     if (existing) {
@@ -343,12 +387,14 @@ function saveMemory(e) {
     e.preventDefault();
     if (!activeTargetId) return;
 
+    const cName = currentSelectedCountryName || getCountryNameByIso(currentSelectedCountryIso);
+
     userVisitedData[activeTargetId] = {
         date: document.getElementById('travel-date').value,
         note: document.getElementById('travel-note').value,
         img: currentBase64Image,
         countryIso: currentSelectedCountryIso,
-        countryName: currentSelectedCountryName,
+        countryName: cName,
         timestamp: Date.now()
     };
 
@@ -383,9 +429,7 @@ function deleteMemory() {
     closeDiaryModal();
 }
 
-// -------------------------------------------------------------
 // Statistics & Badges Evaluator
-// -------------------------------------------------------------
 function updateStatsAndBadges() {
     const keys = Object.keys(userVisitedData);
 
@@ -411,11 +455,11 @@ function updateStatsAndBadges() {
     const badgeFlyer = document.getElementById('badge-flyer');
     const badgeMaster = document.getElementById('badge-master');
 
-    // Check Asian countries (e.g. Thailand, Japan, China, S. Korea, Singapore, etc.)
+    // Check Asian countries
     const hasAsia = Array.from(countriesVisitedSet).some(c => ['Thailand', 'Japan', 'China', 'South Korea', 'Singapore'].includes(c));
     badgeAsian.classList.toggle('unlocked', hasAsia);
 
-    // Check European countries (e.g. United Kingdom, France, Germany, Italy, Spain, etc.)
+    // Check European countries
     const hasEuro = Array.from(countriesVisitedSet).some(c => ['United Kingdom', 'France', 'Germany', 'Italy', 'Spain'].includes(c));
     badgeEuro.classList.toggle('unlocked', hasEuro);
 
